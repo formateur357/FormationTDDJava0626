@@ -849,6 +849,118 @@ class ConseillerVetementsTest {
 
 Réécrivez les 3 tests de l'Ex 1.3 avec un `@Mock NotificationService`.
 
+```java
+import java.util.List;
+
+public interface NotificationService {
+    void notifierParEmail(String destinataire, String message);
+    void notifierParSMS(String telephone, String message);
+    void notifierParPush(String userId, String titre, String corps);
+}
+```
+
+```java
+import java.util.List;
+
+public class AlerteService {
+
+    private final NotificationService notificationService;
+
+    public AlerteService(NotificationService notificationService) {
+        this.notificationService = notificationService;
+    }
+
+    public void declencherAlerteUrgente(List<String> emailsAdmins,
+                                        String telephone,
+                                        String message) {
+        for (String email : emailsAdmins) {
+            notificationService.notifierParEmail(email, "[URGENT] " + message);
+        }
+
+        notificationService.notifierParSMS(telephone, message);
+    }
+}
+```
+
+```java
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class AlerteServiceTest {
+
+    @Mock
+    NotificationService notificationService;
+
+    @InjectMocks
+    AlerteService alerteService;
+
+    @Test
+    void declencherAlerteUrgente_3Admins_Envoie3Emails() {
+        // Arrange
+        List<String> admins = List.of(
+            "admin1@test.fr",
+            "admin2@test.fr",
+            "admin3@test.fr"
+        );
+
+        // Act
+        alerteService.declencherAlerteUrgente(
+            admins,
+            "0600000000",
+            "Serveur indisponible"
+        );
+
+        // Assert
+        verify(notificationService, times(3))
+            .notifierParEmail(anyString(), anyString());
+
+        verify(notificationService)
+            .notifierParSMS("0600000000", "Serveur indisponible");
+    }
+
+    @Test
+    void declencherAlerteUrgente_PrefixeUrgent_DansTousLesEmails() {
+        List<String> admins = List.of("a@test.fr", "b@test.fr");
+
+        alerteService.declencherAlerteUrgente(
+            admins,
+            "0600000000",
+            "Incident critique"
+        );
+
+        verify(notificationService, times(2))
+            .notifierParEmail(anyString(), startsWith("[URGENT]"));
+    }
+
+    @Test
+    void declencherAlerteUrgente_ToujoursUnSMS_IndependammentDuNombreAdmins() {
+        List<String> admins = List.of();
+
+        alerteService.declencherAlerteUrgente(
+            admins,
+            "0600000000",
+            "Incident critique"
+        );
+
+        verify(notificationService, never())
+            .notifierParEmail(anyString(), anyString());
+
+        verify(notificationService)
+            .notifierParSMS("0600000000", "Incident critique");
+    }
+}
+```
+
+
 **Question de réflexion :** Dans l'exercice B, utilisez-vous le mock comme un Stub ou comme un Mock (au sens de la théorie) ? Pourquoi ?
 
 ---
