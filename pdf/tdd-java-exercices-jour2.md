@@ -385,37 +385,91 @@ public class AlerteService {
 **Étape 3 — Écrivez les tests avec votre Spy**
 
 ```java
-@Test
-void declencherAlerteUrgente_3Admins_Envoie3Emails() { 
-    // Arrange
-    SpyNotificationService spyNotification = new SpyNotificationService();
-    AlerteService alerte = new AlerteService(spyNotification);
+package com.formation.tdd.doubles;
 
-    List<String> admins = List.of(
-        "admin1@entreprise.com",
-        "admin2@entreprise.com",
-        "admin3@entreprise.com",
-    )
+import org.junit.jupiter.api.Test;
 
-    // Act
-    alerteService.declencherAlerteUrgente(
-        admins,
-        "0600000000",
-        "serveur Indisponible"
-    );
+import java.util.List;
 
-    // Assert 
-    assertEquals(3, spyNotification.getNombreEmailsEnvoyes());
-    assertTrue(spyNotification.aEteNotifieParEmail("admin1@entreprise.com"));
-    assertTrue(spyNotification.aEteNotifieParEmail("admin2@entreprise.com"));
-    assertTrue(spyNotification.aEteNotifieParEmail("admin3@entreprise.com"));
- }
+import static org.junit.jupiter.api.Assertions.*;
 
-@Test
-void declencherAlerteUrgente_PrefixeUrgent_DansTousLesEmails() { ... }
+class AlerteServiceTest {
 
-@Test
-void declencherAlerteUrgente_ToujoursUnSMS_IndependammentDuNombreAdmins() { ... }
+    @Test
+    void declencherAlerteUrgente_3Admins_Envoie3Emails() {
+        // Arrange
+        SpyNotificationService spyNotification = new SpyNotificationService();
+        AlerteService alerteService = new AlerteService(spyNotification);
+
+        List<String> admins = List.of(
+            "admin1@entreprise.com",
+            "admin2@entreprise.com",
+            "admin3@entreprise.com"
+        );
+
+        // Act
+        alerteService.declencherAlerteUrgente(
+            admins,
+            "0600000000",
+            "Serveur indisponible"
+        );
+
+        // Assert
+        assertEquals(3, spyNotification.getNombreEmailsEnvoyes());
+        assertTrue(spyNotification.aEteNotifieParEmail("admin1@entreprise.com"));
+        assertTrue(spyNotification.aEteNotifieParEmail("admin2@entreprise.com"));
+        assertTrue(spyNotification.aEteNotifieParEmail("admin3@entreprise.com"));
+    }
+
+    @Test
+    void declencherAlerteUrgente_PrefixeUrgent_DansTousLesEmails() {
+        // Arrange
+        SpyNotificationService spyNotification = new SpyNotificationService();
+        AlerteService alerteService = new AlerteService(spyNotification);
+
+        List<String> admins = List.of(
+            "admin1@entreprise.com",
+            "admin2@entreprise.com"
+        );
+
+        // Act
+        alerteService.declencherAlerteUrgente(
+            admins,
+            "0600000000",
+            "Base de données inaccessible"
+        );
+
+        // Assert
+        for (String message : spyNotification.getTousLesMessagesEmail()) {
+            assertTrue(
+                message.startsWith("[URGENT] "),
+                "Tous les emails doivent commencer par [URGENT]"
+            );
+        }
+    }
+
+    @Test
+    void declencherAlerteUrgente_ToujoursUnSMS_IndependammentDuNombreAdmins() {
+        // Arrange
+        SpyNotificationService spyNotification = new SpyNotificationService();
+        AlerteService alerteService = new AlerteService(spyNotification);
+
+        List<String> admins = List.of();
+
+        // Act
+        alerteService.declencherAlerteUrgente(
+            admins,
+            "0600000000",
+            "Incident critique"
+        );
+
+        // Assert
+        assertEquals(0, spyNotification.getNombreEmailsEnvoyes());
+        assertEquals(1, spyNotification.getNombreSMSEnvoyes());
+        assertEquals("0600000000", spyNotification.getDernierNumeroSMS());
+        assertEquals("Incident critique", spyNotification.getDernierMessageSMS());
+    }
+}
 ```
 
 ---
@@ -527,7 +581,18 @@ public class InMemoryProductRepository implements ProductRepository {
 Écrivez **8 tests** pour valider que votre Fake se comporte correctement. Le Fake est une implémentation — il mérite d'être testé !
 
 ```
+package com.formation.tdd.doubles;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+
 class InMemoryProductRepositoryTest {
+
     private InMemoryProductRepository repository;
 
     @BeforeEach
@@ -536,17 +601,156 @@ class InMemoryProductRepositoryTest {
     }
 
     @Test
-    void save_ProduitSansId_GenereIdAutoIncrement() {
+    void save_ProduitSansId_GenereIdAutoIncremente() {
         // Arrange
-        Product product = new Product("Ref-001", "clavier", "Informatique", 49.99);
+        Product product = new Product("REF-001", "Clavier", "Informatique", 49.99);
 
         // Act
         Product saved = repository.save(product);
 
         // Assert
-        assertEquals(1, save.get(1));
+        assertEquals(1L, saved.getId());
         assertEquals(1, repository.count());
-        
+    }
+
+    @Test
+    void save_DeuxProduitsSansId_GenereIdsDifferents() {
+        // Arrange
+        Product clavier = new Product("REF-001", "Clavier", "Informatique", 49.99);
+        Product souris = new Product("REF-002", "Souris", "Informatique", 19.99);
+
+        // Act
+        Product clavierSauvegarde = repository.save(clavier);
+        Product sourisSauvegardee = repository.save(souris);
+
+        // Assert
+        assertEquals(1L, clavierSauvegarde.getId());
+        assertEquals(2L, sourisSauvegardee.getId());
+        assertEquals(2, repository.count());
+    }
+
+    @Test
+    void save_ProduitExistant_MetAJourLeProduit() {
+        // Arrange
+        Product product = new Product("REF-001", "Clavier", "Informatique", 49.99);
+        Product saved = repository.save(product);
+
+        saved.setNom("Clavier mécanique");
+        saved.setPrix(89.99);
+
+        // Act
+        repository.save(saved);
+
+        // Assert
+        Optional<Product> found = repository.findById(saved.getId());
+
+        assertTrue(found.isPresent());
+        assertEquals("Clavier mécanique", found.get().getNom());
+        assertEquals(89.99, found.get().getPrix(), 0.001);
+        assertEquals(1, repository.count());
+    }
+
+    @Test
+    void findById_IdExistant_RetourneProduit() {
+        // Arrange
+        Product product = new Product("REF-001", "Clavier", "Informatique", 49.99);
+        Product saved = repository.save(product);
+
+        // Act
+        Optional<Product> found = repository.findById(saved.getId());
+
+        // Assert
+        assertTrue(found.isPresent());
+        assertEquals("Clavier", found.get().getNom());
+    }
+
+    @Test
+    void findById_IdInexistant_RetourneOptionalVide() {
+        // Act
+        Optional<Product> found = repository.findById(999L);
+
+        // Assert
+        assertTrue(found.isEmpty());
+    }
+
+    @Test
+    void findByReference_CasseDifferente_RetourneProduit() {
+        // Arrange
+        Product product = new Product("ABC-123", "Écran", "Informatique", 199.99);
+        repository.save(product);
+
+        // Act
+        Optional<Product> found = repository.findByReference("abc-123");
+
+        // Assert
+        assertTrue(found.isPresent());
+        assertEquals("Écran", found.get().getNom());
+    }
+
+    @Test
+    void findByCategorie_CategorieExistante_RetourneProduitsCorrespondants() {
+        // Arrange
+        repository.save(new Product("REF-001", "Clavier", "Informatique", 49.99));
+        repository.save(new Product("REF-002", "Souris", "Informatique", 19.99));
+        repository.save(new Product("REF-003", "Chaise", "Mobilier", 99.99));
+
+        // Act
+        List<Product> produits = repository.findByCategorie("Informatique");
+
+        // Assert
+        assertEquals(2, produits.size());
+        assertTrue(produits.stream().allMatch(p -> p.getCategorie().equals("Informatique")));
+    }
+
+    @Test
+    void deleteById_IdExistant_SupprimeProduit() {
+        // Arrange
+        Product product = repository.save(
+            new Product("REF-001", "Clavier", "Informatique", 49.99)
+        );
+
+        // Act
+        repository.deleteById(product.getId());
+
+        // Assert
+        assertEquals(0, repository.count());
+        assertTrue(repository.findById(product.getId()).isEmpty());
+    }
+
+    @Test
+    void deleteById_IdInexistant_NeFaitRien() {
+        // Arrange
+        repository.save(new Product("REF-001", "Clavier", "Informatique", 49.99));
+
+        // Act + Assert
+        assertDoesNotThrow(() -> repository.deleteById(999L));
+        assertEquals(1, repository.count());
+    }
+
+    @Test
+    void existsByReference_ReferenceExistanteAvecCasseDifferente_RetourneTrue() {
+        // Arrange
+        repository.save(new Product("REF-001", "Clavier", "Informatique", 49.99));
+
+        // Act
+        boolean exists = repository.existsByReference("ref-001");
+
+        // Assert
+        assertTrue(exists);
+    }
+
+    @Test
+    void clear_ApresAppel_VideLeRepositoryEtReinitialiseSequence() {
+        // Arrange
+        repository.save(new Product("REF-001", "Clavier", "Informatique", 49.99));
+        repository.clear();
+
+        // Act
+        Product saved = repository.save(new Product("REF-002", "Souris", "Informatique", 19.99));
+
+        // Assert
+        assertEquals(1L, saved.getId());
+        assertEquals(1, repository.count());
     }
 }
 ```
@@ -567,28 +771,77 @@ class InMemoryProductRepositoryTest {
 **Exercice A — Réécriture du ConseillerVetements**
 
 ```java
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
+
 @ExtendWith(MockitoExtension.class)
 class ConseillerVetementsTest {
 
     @Mock
-    MeteoService meteoService;   // ← Mockito crée le stub
+    MeteoService meteoService;
 
     @InjectMocks
     ConseillerVetements conseiller;
 
     @Test
     void conseiller_GrandFroid_RecommandeManteauChaud() {
-        // Configurer le comportement du mock
+        // Arrange
         when(meteoService.getTemperature(anyString())).thenReturn(5);
         when(meteoService.isRisquePluie(anyString())).thenReturn(false);
 
+        // Act
         String conseil = conseiller.conseiller("Paris");
 
+        // Assert
         assertEquals("Manteau chaud obligatoire", conseil);
-        // Question : faut-il vérifier les appels au mock ici ?
     }
 
-    // ... complétez les 4 autres scénarios
+    @Test
+    void conseiller_FraisAvecPluie_RecommandeImpermeable() {
+        when(meteoService.getTemperature(anyString())).thenReturn(15);
+        when(meteoService.isRisquePluie(anyString())).thenReturn(true);
+
+        String conseil = conseiller.conseiller("Lyon");
+
+        assertEquals("Veste imperméable recommandée", conseil);
+    }
+
+    @Test
+    void conseiller_FraisSansPluie_RecommandeVesteLegere() {
+        when(meteoService.getTemperature(anyString())).thenReturn(15);
+        when(meteoService.isRisquePluie(anyString())).thenReturn(false);
+
+        String conseil = conseiller.conseiller("Nantes");
+
+        assertEquals("Veste légère conseillée", conseil);
+    }
+
+    @Test
+    void conseiller_ChaudAvecPluie_RecommandeParapluie() {
+        when(meteoService.getTemperature(anyString())).thenReturn(25);
+        when(meteoService.isRisquePluie(anyString())).thenReturn(true);
+
+        String conseil = conseiller.conseiller("Bordeaux");
+
+        assertEquals("Parapluie recommandé", conseil);
+    }
+
+    @Test
+    void conseiller_ChaudSansPluie_RecommandeTenueEstivale() {
+        when(meteoService.getTemperature(anyString())).thenReturn(28);
+        when(meteoService.isRisquePluie(anyString())).thenReturn(false);
+
+        String conseil = conseiller.conseiller("Marseille");
+
+        assertEquals("Tenue estivale", conseil);
+    }
 }
 ```
 
