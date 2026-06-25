@@ -165,14 +165,25 @@ public class ConseillerVetements {
 ```java
 // À compléter
 class StubMeteoServiceFroid implements MeteoService {
-    @Override
-    public String getMeteo(String ville) { /* retourne "Froid" */ }
+
+    private final String meteo;
+    private final int temperature;
+    private final boolean risquePluie;
+
+    public stubMeteoService(String meteo, int temperature, boolean risquePluie) {
+        this.meteo = meteo;
+        this.temperature = temperature;
+        this.risquePluie = risquePluie;
+    }
 
     @Override
-    public int getTemperature(String ville) { /* retourne 5 */ }
+    public String getMeteo(String ville) { return meteo; }
 
     @Override
-    public boolean isRisquePluie(String ville) { /* retourne false */ }
+    public int getTemperature(String ville) { return temperature; }
+
+    @Override
+    public boolean isRisquePluie(String ville) { return risquePluie; }
 }
 ```
 
@@ -184,19 +195,69 @@ class StubMeteoServiceFroid implements MeteoService {
 class ConseillerVetementsTest {
 
     @Test
-    void conseiller_GrandFroidSansPluie_RecommandeManeauChaud() { ... }
+    void conseiller_GrandFroidSansPluie_RecommandeManeauChaud() { 
+        // Arrange
+        MeteoService meteoService = new StubMeteoService("Froid", 5, false);
+        ConseillerVetements conseiller = new ConseillerVetements(meteoService);
+        
+        // Act
+        string conseil = conseiller.conseiller("Paris");
+
+        // Assert
+        assertEquals("Manteau chaud obligatoire", conseil);
+    }
 
     @Test
-    void conseiller_FraisAvecPluie_RecommandeImperméable() { ... }
+    void conseiller_FraisAvecPluie_RecommandeImperméable() { 
+            // Arrange
+        MeteoService meteoService = new StubMeteoService("Pluvieux", 15, true);
+        ConseillerVetements conseiller = new ConseillerVetements(meteoService);
+        
+        // Act
+        string conseil = conseiller.conseiller("Lille");
+
+        // Assert
+        assertEquals("Veste imperméable recommandée", conseil);
+     }
 
     @Test
-    void conseiller_FraisSansPluie_RecommandeVesteLegere() { ... }
+    void conseiller_FraisSansPluie_RecommandeVesteLegere() { 
+            // Arrange
+        MeteoService meteoService = new StubMeteoService("Nuageux", 15, false);
+        ConseillerVetements conseiller = new ConseillerVetements(meteoService);
+        
+        // Act
+        string conseil = conseiller.conseiller("Nantes");
+
+        // Assert
+        assertEquals("Veste légère conseillée", conseil);
+     }
 
     @Test
-    void conseiller_ChaudAvecPluie_RecommandeParapluie() { ... }
+    void conseiller_ChaudAvecPluie_RecommandeParapluie() { 
+                // Arrange
+        MeteoService meteoService = new StubMeteoService("Orageux", 25, true);
+        ConseillerVetements conseiller = new ConseillerVetements(meteoService);
+        
+        // Act
+        string conseil = conseiller.conseiller("Marseille");
+
+        // Assert
+        assertEquals("Parapluie recommandé", conseil);
+     }
 
     @Test
-    void conseiller_ChaudSansPluie_RecommandeTenueEstivale() { ... }
+    void conseiller_ChaudSansPluie_RecommandeTenueEstivale() { 
+                // Arrange
+        MeteoService meteoService = new StubMeteoService("Ensoleillé", 28, false);
+        ConseillerVetements conseiller = new ConseillerVetements(meteoService);
+        
+        // Act
+        string conseil = conseiller.conseiller("Nice");
+
+        // Assert
+        assertEquals("Tenue estivale", conseil);
+     }
 }
 ```
 
@@ -220,16 +281,87 @@ public interface NotificationService {
 
 ```java
 class SpyNotificationService implements NotificationService {
+    private final List<String> destinatairesEmail = new ArrayList<>();
+    private final List<String> messagesEmail = new ArrayList<>();
+
+    private final List<String> numerosSMS = new ArrayList<>();
+    private final List<String> messagesSMS = new ArrayList<>();
+
+    private final List<String> userIdsPush = new ArrayList<>();
+    private final List<String> titresPush = new ArrayList<>();
+    private final List<String> corpsPush = new ArrayList<>();
+
     // Enregistrez TOUS les appels :
     // - Nombre d'appels à chaque méthode
     // - Arguments de chaque appel (liste de destinataires, messages)
 
+    @Override
+    public void notifierParEmail(String destinataire, String message) {
+        destinairesEmail.add(destinataire);
+        messagesEmail.add(message);
+    }
+
+    @Override
+    public void notifierParSMS(String telephone, String message) {
+        numerosSMS.add(telephone);
+        messagesSMS.add(message);
+    }
+    
+    @Override
+    public void notifierParPush(String userId, String titre, String corps) {
+        userIdsPush.add(userId);
+        titresPush.add(titre);
+        corpsPush.add(corps);
+    }
+
     // Méthodes d'inspection à créer :
     // - getNombreEmailsEnvoyes()
+    public int getNombreEmailsEnvoyes() {
+        return destinatairesEmail.size();
+    }
     // - getNombreSMSEnvoyes()
+    public int getNombreSMSEnvoyes() {
+        return numerosSMS.size();
+    }
+
+    public int getNombrePushEnvoyes() {
+        return userIdsPush.size();
+    }
     // - aEteNotifieParEmail(String destinataire)
+    public boolean aEteNotifieParEmail(String destinataire) {
+        return destinatairesEmail.contains(destinataire);
+    }
     // - getDernierMessageEmail()
+    public int getDernierMessageEmail() {
+        if (messagesEmail.isEmpty()) {
+            return null;
+        }
+        
+        return messagesEmail.get(messagesEmail.size() - 1);
+    }
     // - getTousLesDestinatairesEmail() → List<String>
+    public List<String> getTousLesDestinatairesEmail() {
+        return new ArrayList<>(destinatairesEmail);
+    }
+
+    public List<String> getTousLesMessagesEmail() {
+        return new ArrayList<>(messagesEmail);
+    }
+
+    public List<String> getDernierNumerosSMS() {
+        if (numerosSMS.isEmpty()) {
+            return null;
+        }
+
+        return numerosSMS.get(numerosSMS.size() - 1)
+    }
+
+    public List<String> getDernierMessageSMS() {
+        if (messagesSMS.isEmpty()) {
+            return null;
+        }
+
+        return messagesSMS.get(messagesSMS.size() - 1)    }
 }
 ```
 
@@ -254,7 +386,30 @@ public class AlerteService {
 
 ```java
 @Test
-void declencherAlerteUrgente_3Admins_Envoie3Emails() { ... }
+void declencherAlerteUrgente_3Admins_Envoie3Emails() { 
+    // Arrange
+    SpyNotificationService spyNotification = new SpyNotificationService();
+    AlerteService alerte = new AlerteService(spyNotification);
+
+    List<String> admins = List.of(
+        "admin1@entreprise.com",
+        "admin2@entreprise.com",
+        "admin3@entreprise.com",
+    )
+
+    // Act
+    alerteService.declencherAlerteUrgente(
+        admins,
+        "0600000000",
+        "serveur Indisponible"
+    );
+
+    // Assert 
+    assertEquals(3, spyNotification.getNombreEmailsEnvoyes());
+    assertTrue(spyNotification.aEteNotifieParEmail("admin1@entreprise.com"));
+    assertTrue(spyNotification.aEteNotifieParEmail("admin2@entreprise.com"));
+    assertTrue(spyNotification.aEteNotifieParEmail("admin3@entreprise.com"));
+ }
 
 @Test
 void declencherAlerteUrgente_PrefixeUrgent_DansTousLesEmails() { ... }
@@ -307,16 +462,94 @@ public class InMemoryProductRepository implements ProductRepository {
 
     @Override
     public Product save(Product product) {
-        // TODO
+        if (product.getId == null) {
+            product.setId(nextId);
+            nextId++
+        } else if (product.getId() >= nextId) {
+            nextId = product.getId + 1;1
+        }
+
+        store.put(product.getId(), product);
+        return product;
     }
 
-    // ... implémenter toutes les méthodes
+    @Override
+    public Optional<Product> findById(Long id) {
+        return Optional.ofNullable(store.get(id));
+    }
+
+    @Override
+    public Optional<Product> findByReference(String ref) {
+        if (ref == null) {
+            return Optional.empty();
+        }
+
+        return store.values()
+            .stream()
+            .filter(product -> product.getReference() != null)
+            .filter(product -> product.getReference().equalsIgnoreCase(ref))
+            .findFirst();
+    }
+
+    @Override
+    public List<Product> findByCategorie(String categorie) {
+        return store.values()
+            .stream()
+            .filter(product -> product.getCategorie() != null)
+            .filter(product -> product.getCategorie().equals(categorie))
+            .toList();
+        }
+
+    @Override
+    public List<Product> findAll() {
+        return new ArrayList<>(store.values());
+    }
+
+    @Override
+    public void deleteById(Long id) {
+        store.remove(id);
+    }
+
+    @Override
+    public boolean existsByReference(String ref) {
+        return findByReference(ref).isPresent();
+    }
+
+    @Override
+    public long count() {
+        return store.size();
+    }
 }
 ```
 
 **Tests du Fake lui-même :**
 
 Écrivez **8 tests** pour valider que votre Fake se comporte correctement. Le Fake est une implémentation — il mérite d'être testé !
+
+```
+class InMemoryProductRepositoryTest {
+    private InMemoryProductRepository repository;
+
+    @BeforeEach
+    void setUp() {
+        repository = new InMemoryProductRepository();
+    }
+
+    @Test
+    void save_ProduitSansId_GenereIdAutoIncrement() {
+        // Arrange
+        Product product = new Product("Ref-001", "clavier", "Informatique", 49.99);
+
+        // Act
+        Product saved = repository.save(product);
+
+        // Assert
+        assertEquals(1, save.get(1));
+        assertEquals(1, repository.count());
+        
+    }
+}
+```
 
 ---
 

@@ -360,6 +360,8 @@ MaClasseReelle spy = spy(new MaClasseReelle());
 | `thenAnswer(inv -> ...)` | Comportement dynamique | `when(r.save(any())).thenAnswer(inv -> inv.getArgument(0))` |
 | `thenCallRealMethod()` | Déléguer à l'implémentation | `when(spy.calc()).thenCallRealMethod()` |
 
+`verify(emailService).envoyer(eq("alice@email.com"), anyString());` | assertion comportementale
+
 ### Stubbing pour méthodes void — `do*().when()`
 
 | Méthode | Usage |

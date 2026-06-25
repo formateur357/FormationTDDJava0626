@@ -340,6 +340,9 @@ Vérifie que certaines **interactions ont bien eu lieu** : quelles méthodes ont
 
 - **Stub** → vous contrôlez l'**entrée** (ce que la dépendance retourne)
 - **Mock** → vous vérifiez la **sortie** (ce que le code sous test *fait* avec la dépendance)
+```
+verify(emailService).envoyer("bob@mail.com", "Confirmation", "...");
+```
 
 ---
 
