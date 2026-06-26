@@ -128,13 +128,13 @@ public class FactureManager {
 | # | Problème identifié | Catégorie | Impact | Technique de correction |
 |---|--------------------|-----------|--------|------------------------|
 | 1 | Singleton avec état mutable | Couplage | Impossible à tester | Injection de dépendances |
-| 2 | Connexion BDD dans le constructeur | ? | ? | ? |
-| 3 | Credentials en dur dans le code | ? | ? | ? |
-| 4 | Injection SQL (`type` non échappé) | ? | ? | ? |
-| 5 | Exception silencieuse (catch vide) | ? | ? | ? |
-| 6 | Logique métier mélangée à l'accès BDD | ? | ? | ? |
-| 7 | Constantes magiques (0.85, 1000, 50) | ? | ? | ? |
-| 8 | Méthode `calcul` fait 4 choses à la fois | ? | ? | ? |
+| 2 | Connexion BDD dans le constructeur | Dependance dure | impossible de creer l'objet sans vraie bdd | Parametrize constructor |
+| 3 | Credentials en dur dans le code | Sécurité | impossible de changer l'environnement, fuite de secrets | externaliser la configuration |
+| 4 | Injection SQL (`type` non échappé) | Sécurité | Risque d'injections SQL | PreparedStatement/Repository |
+| 5 | Exception silencieuse (catch vide) | Robustesse | Les erreurs sont masquées | exception métier/ Logger |
+| 6 | Logique métier mélangée à l'accès BDD | Responsabilité multiples | imossible de tester la remise sans BDD | extraire remiseService |
+| 7 | Constantes magiques (0.85, 1000, 50) | Lisibilité | regles métiers incompréhensible | constantes nommées |
+| 8 | Méthode `calcul` fait 4 choses à la fois | trop de responsabilité | Lecture BDD, calcul, remise, écriture facture | Separation en services |
 
 **Question bonus :** Pourquoi la méthode `reset()` suggère-t-elle que quelqu'un a essayé de tester ce code ? Que révèle-t-elle sur l'architecture ?
 
