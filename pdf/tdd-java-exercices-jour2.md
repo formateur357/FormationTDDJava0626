@@ -1363,21 +1363,81 @@ public class InscriptionService {
 **Tests avec ArgumentCaptor :**
 
 ```java
-// Test 1 : L'utilisateur sauvegardé a l'email en minuscules
-void inscrire_EmailAvecMajuscules_SauvegardeEnMinuscules()
-// → Capturer le User passé à repository.save() et vérifier user.getEmail()
+@ExtendWith(MockitoExtension.class)
+class CommandeServiceTest {
 
-// Test 2 : L'email envoyé contient le prénom de l'utilisateur
-void inscrire_NomAlice_EmailContientAlice()
-// → Capturer les 3 arguments de emailService.envoyer()
+    @Mock
+    private UserRepository repository;
 
-// Test 3 : L'audit contient l'IP d'origine
-void inscrire_DepuisIPConnue_AuditContientIP()
-// → Capturer le Map passé à auditService.enregistrer()
+    @Mock
+    private EmailService emailService;
 
-// Test 4 : Le mot de passe stocké est hashé (pas en clair)
-void inscrire_MotDePasse_NestPasStockeEnClair()
-// → Capturer le User et vérifier que user.getMotDePasse() != request.getMotDePasse()
+    @Mock
+    private AuditService auditService;
+
+    @InjectMock
+    private InscriptionService;
+
+    @Test
+    // Test 1 : L'utilisateur sauvegardé a l'email en minuscules
+    void inscrire_EmailAvecMajuscules_SauvegardeEnMinuscules() {
+        // Arrange
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+
+        // Act
+        inscriptionService.inscrire({"Alice", "alice@exemple.com", "passwrd", "127.0.0.1"});
+
+        // Assert
+        verify(repository).save(userCaptor.capture());
+
+        User userSauvegarde = userCaptor.getValue();
+
+        assertEquals("alice@exemple.com", userSauvegarde.getEmail());
+    }
+    // → Capturer le User passé à repository.save() et vérifier user.getEmail()
+
+    @Test
+    // Test 2 : L'email envoyé contient le prénom de l'utilisateur
+    void inscrire_NomAlice_EmailContientAlice() {
+        // Arrange
+        ArgumentCaptor<String> destinataireCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> sujetCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> corpsCaptor = ArgumentCaptor.forClass(String.class);
+
+        // Act
+        inscriptionService.inscrire({"Alice", "alice@exemple.com", "passwrd", "127.0.0.1"});
+        inscriptionService.inscrire({"Bernard", "bernard@exemple.com", "passwrd", "127.0.0.1"});
+        inscriptionService.inscrire({"Charlie", "charlie@exemple.com", "passwrd", "127.0.0.1"});
+
+        // Assert
+        verify(emailService).envoyer(destinataireCaptor.capture(), sujetCaptor.capture(), corpsCaptor.capture());
+
+        // verify(emailService, times(3)).envoyer(destinataireCaptor.capture(), anyString(), anyString());
+        // List<String> destinataires = destinataireCaptor.getAllValues();
+
+
+        assertEquals("Alice", destinataireCaptor.getValue());
+        assertEquals(sujetCaptor.getValue().contains("alice@exemple.com"));
+        assertEquals(corpsCaptor.getValue().contains("passwrd"));
+
+    }
+    // → Capturer les 3 arguments de emailService.envoyer()
+
+    @Test
+    // Test 3 : L'audit contient l'IP d'origine
+    void inscrire_DepuisIPConnue_AuditContientIP() {
+
+    }
+    // → Capturer le Map passé à auditService.enregistrer()
+
+    @Test
+    // Test 4 : Le mot de passe stocké est hashé (pas en clair)
+    void inscrire_MotDePasse_NestPasStockeEnClair() {
+
+    }
+    // → Capturer le User et vérifier que user.getMotDePasse() != request.getMotDePasse()
+}
+
 ```
 
 ---
