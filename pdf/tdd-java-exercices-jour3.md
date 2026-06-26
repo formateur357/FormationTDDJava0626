@@ -408,7 +408,13 @@ public class RapportLegacy {
         );
     }
 
-
+    public RapportLegacy(DatabaseAccessor db,
+                         FileWriter fileWriter,
+                         EmailSender emailSender) {
+        this.db = Objects.requireNonNull(db);
+        this.fileWriter = Objects.requireNonNull(fileWriter);
+        this.emailSender = Objects.requireNonNull(emailSender);
+    }
 
     public void genererEtEnvoyer(String mois) {
         List<Ligne> donnees =
@@ -473,7 +479,117 @@ void genererEtEnvoyer_EmailContientNomFichier()
 void genererEtEnvoyer_AucuneDonnee_RapportVide()
 void genererEtEnvoyer_EchecEcriture_NEnvoiePasEmail()
 
+package com.formation.tdd.legacy.rapport;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.*;
+
+class RapportLegacyTest {
+
+    private DatabaseAccessor db;
+    private FileWriter fileWriter;
+    private EmailSender emailSender;
+    private RapportLegacy rapport;
+
+    @BeforeEach
+    void setUp() {
+        db = mock(DatabaseAccessor.class);
+        fileWriter = mock(FileWriter.class);
+        emailSender = mock(EmailSender.class);
+
+        rapport = new RapportLegacy(db, fileWriter, emailSender);
+    }
+
+    @Test
+    void genererEtEnvoyer_DonneesTrouvees_FormateEtEcrit() {
+        when(db.requeter(anyString()))
+            .thenReturn(List.of(new Ligne("Produit A", 100.0)));
+
+        when(fileWriter.ecrire(anyString(), anyString()))
+            .thenReturn("/tmp/rapport_2024-01.txt");
+
+        rapport.genererEtEnvoyer("2024-01");
+
+        verify(fileWriter).ecrire(
+            eq("rapport_2024-01.txt"),
+            contains("Produit A")
+        );
+    }
+
+    @Test
+    void genererEtEnvoyer_FichierEcrit_EnvoieEmail() {
+        when(db.requeter(anyString()))
+            .thenReturn(List.of(new Ligne("Produit A", 100.0)));
+
+        when(fileWriter.ecrire(anyString(), anyString()))
+            .thenReturn("/tmp/rapport_2024-01.txt");
+
+        rapport.genererEtEnvoyer("2024-01");
+
+        verify(emailSender).envoyer(
+            eq("direction@entreprise.com"),
+            eq("Rapport 2024-01"),
+            contains("/tmp/rapport_2024-01.txt")
+        );
+    }
+
+    @Test
+    void genererEtEnvoyer_EmailContientNomFichier() {
+        when(db.requeter(anyString()))
+            .thenReturn(List.of(new Ligne("Produit A", 100.0)));
+
+        when(fileWriter.ecrire(anyString(), anyString()))
+            .thenReturn("/var/reports/rapport_2024-02.txt");
+
+        rapport.genererEtEnvoyer("2024-02");
+
+        ArgumentCaptor<String> corpsCaptor = ArgumentCaptor.forClass(String.class);
+
+        verify(emailSender).envoyer(
+            anyString(),
+            anyString(),
+            corpsCaptor.capture()
+        );
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+            corpsCaptor.getValue().contains("rapport_2024-02.txt")
+        );
+    }
+
+    @Test
+    void genererEtEnvoyer_AucuneDonnee_RapportVide() {
+        when(db.requeter(anyString())).thenReturn(List.of());
+        when(fileWriter.ecrire(anyString(), anyString()))
+            .thenReturn("/tmp/rapport_vide.txt");
+
+        rapport.genererEtEnvoyer("2024-03");
+
+        verify(fileWriter).ecrire(
+            eq("rapport_2024-03.txt"),
+            eq("Rapport vide")
+        );
+    }
+
+    @Test
+    void genererEtEnvoyer_EchecEcriture_NEnvoiePasEmail() {
+        when(db.requeter(anyString()))
+            .thenReturn(List.of(new Ligne("Produit A", 100.0)));
+
+        when(fileWriter.ecrire(anyString(), anyString()))
+            .thenThrow(new RuntimeException("Disque plein"));
+
+        assertThrows(RuntimeException.class,
+            () -> rapport.genererEtEnvoyer("2024-04"));
+
+        verify(emailSender, never()).envoyer(anyString(), anyString(), anyString());
+    }
+}
 ```
 
 **Règle :** Le constructeur original doit **continuer à fonctionner** (pas de régression).
@@ -526,11 +642,100 @@ public class WeatherReportService {
 3. Écrivez **4 tests** :
 
 ```java
+
+public class WeatherreportService {
+    public String genererBulletin(String ville) {
+        try {
+            String json = appelAPI(ville)
+            return traiterReponse(json, ville);
+        } catch (Exception e) {
+            return "Donnees meteo indisponibles pour " + ville;
+        }
+    }
+
+    protected String appelAPI(String ville) throws Exception {
+        HttpClient client = Httpclient.newHttpClient();
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("https://api.meteo.fr/v2/current?ville=" + ville))
+            .build();
+
+        HttpResponse<String> response = client.send(
+            request,
+            HttpResponse.BodyHandlers.ofString()
+        );
+
+        return response.body();
+    }
+
+    private String traiterReponse(String json, String ville) {
+        // Parsing JSON simplifié
+        if (json.contains("\"temp\":")) {
+            int start = json.indexOf("\"temp\":") + 7;
+            int end = json.indexOf(",", start);
+            String temp = json.substring(start, end).trim();
+            return "Température à " + ville + " : " + temp + "°C";
+        }
+        return "Format de réponse inattendu";
+    }}
+
+class TestableWeatherReportService extends WeatherReportService {
+    private final String jsonRetourne;
+    private final RuntimeException exception;
+
+    TestaBleWeatherReportService(String jsonRetourne) {
+        this.jsonRetourne = jsonRetourne;
+        this.exception = null;
+    }
+
+    TestaBleWeatherReportService(RuntimeException exception) {
+        this.jsonRetourne = null;
+        this.exception = exception;
+    }
+
+    @Override
+    protected String appelAPI(String ville) {
+        if (exception != null) {
+            throw exception;
+        }
+
+        return jsonRetourne;
+    }
+} 
+
 // Tests avec la sous-classe testable
-void genererBulletin_ReponseNormale_ExtractTemperature()
-void genererBulletin_ReponseAvecTemp25_AfficheCorrct()
-void genererBulletin_ReponseVide_RetourneFormatInattendu()
-void genererBulletin_ExceptionAPI_RetourneMessageErreur()
+@Test
+void genererBulletin_ReponseNormale_ExtractTemperature() {
+    WeatherReportService service = new TestableWeatherReportService("{\"temp\"18, \"humidity\": 70}");
+
+    String resultat = service.genererBulletin("Paris");
+
+    assertEquals("Temperature à Paris : 18°C", resultat);
+}
+
+void genererBulletin_ReponseAvecTemp25_AfficheCorrct(){
+    WeatherReportService service = new TestableWeatherReportService("{\"temp\"25, \"humidity\": 40}");
+
+    String resultat = service.genererBulletin("Lyon");
+
+    assertEquals("Temperature à Lyon : 25", resultat);
+}
+
+void genererBulletin_ReponseVide_RetourneFormatInattendu(){
+    WeatherReportService service = new TestableWeatherReportService("{}");
+
+    String resultat = service.genererBulletin("Nantes");
+
+    assertEquals("Format de reponse innatendu", resultat);
+}
+
+void genererBulletin_ExceptionAPI_RetourneMessageErreur(){
+    WeatherReportService service = new TestableWeatherReportService(new RuntimeException("API down"));
+
+    String resultat = service.genererBulletin("Marseille");
+
+    assertEquals("Donnees meteo indisponibles pour Marseille", resultat);
+}
 ```
 
 ---
