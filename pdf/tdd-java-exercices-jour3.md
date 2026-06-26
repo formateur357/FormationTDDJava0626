@@ -185,34 +185,137 @@ Avant d'écrire les tests, **exécutez mentalement** (ou en debug) la méthode `
 
 | base | typeClient | anciennete | Résultat attendu (calculé à la main) |
 |------|------------|------------|--------------------------------------|
-| 100.0 | "PREMIUM" | 3 | ? |
-| 100.0 | "STANDARD" | 6 | ? |
-| 100.0 | "PREMIUM" | 11 | ? |
-| 100.0 | null | 0 | ? |
-| 10.0 | "PREMIUM" | 11 | ? |
+| 100.0 | "PREMIUM" | 3 | 90.0 |
+| 100.0 | "STANDARD" | 6 | 95.0 |
+| 100.0 | "PREMIUM" | 11 | 65.5 |
+| 100.0 | null | 0 | 100.0 |
+| 10.0 | "PREMIUM" | 11 | 0.0 |
 
 **Étape 2 — Écrire les tests de caractérisation**
 
 Pour **chaque** combinaison ci-dessus, écrivez un test qui documente le comportement actuel, même s'il semble incorrect :
 
 ```java
+package com.formation.tdd.legacy;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
+
 class LegacyCalculateurCaracterisationTest {
 
     private LegacyCalculateur calculateur;
 
     @BeforeEach
-    void setUp() { calculateur = new LegacyCalculateur(); }
-
-    // Tests de formaterMontant (au moins 6 cas)
-    @Test
-    void formaterMontant_Caracterisation_100_EUR() {
-        // Exécuter et noter le VRAI résultat
-        String resultat = calculateur.formaterMontant(100.0, "EUR");
-        assertEquals("???", resultat); // à remplir après exécution
+    void setUp() {
+        calculateur = new LegacyCalculateur();
     }
 
-    // Tests de appliquerRegles (au moins 5 cas)
-    // Tests de decomposerMontant (au moins 4 cas)
+    @Test
+    void formaterMontant_Montant100DeviseEUR_RetourneEUR100() {
+        String resultat = calculateur.formaterMontant(100.0, "EUR");
+
+        assertEquals("EUR100", resultat);
+    }
+
+    @Test
+    void formaterMontant_Montant100_5DeviseEUR_RetourneEUR100_5() {
+        String resultat = calculateur.formaterMontant(100.5, "EUR");
+
+        assertEquals("EUR100.5", resultat);
+    }
+
+    @Test
+    void formaterMontant_Montant100_999_TronqueADeuxDecimales() {
+        String resultat = calculateur.formaterMontant(100.999, "EUR");
+
+        assertEquals("EUR100.99", resultat);
+    }
+
+    @Test
+    void formaterMontant_DeviseNull_RetourneMontantSansDevise() {
+        String resultat = calculateur.formaterMontant(42.0, null);
+
+        assertEquals("42", resultat);
+    }
+
+    @Test
+    void formaterMontant_MontantZero_Retourne0() {
+        String resultat = calculateur.formaterMontant(0.0, "");
+
+        assertEquals("0", resultat);
+    }
+
+    @Test
+    void formaterMontant_MontantNegatif_TronqueVersZero() {
+        String resultat = calculateur.formaterMontant(-1.239, "EUR");
+
+        assertEquals("EUR-1.23", resultat);
+    }
+
+    @Test
+    void appliquerRegles_ClientPremiumAnciennete3_Retourne90() {
+        double resultat = calculateur.appliquerRegles(100.0, "PREMIUM", 3);
+
+        assertEquals(90.0, resultat, 0.001);
+    }
+
+    @Test
+    void appliquerRegles_ClientStandardAnciennete6_Retourne95() {
+        double resultat = calculateur.appliquerRegles(100.0, "STANDARD", 6);
+
+        assertEquals(95.0, resultat, 0.001);
+    }
+
+    @Test
+    void appliquerRegles_ClientPremiumAnciennete11_Retourne65_5() {
+        double resultat = calculateur.appliquerRegles(100.0, "PREMIUM", 11);
+
+        assertEquals(65.5, resultat, 0.001);
+    }
+
+    @Test
+    void appliquerRegles_TypeClientNullAnciennete0_RetourneBase() {
+        double resultat = calculateur.appliquerRegles(100.0, null, 0);
+
+        assertEquals(100.0, resultat, 0.001);
+    }
+
+    @Test
+    void appliquerRegles_PetitMontantPremiumAnciennete11_Retourne0() {
+        double resultat = calculateur.appliquerRegles(10.0, "PREMIUM", 11);
+
+        assertEquals(0.0, resultat, 0.001);
+    }
+
+    @Test
+    void decomposerMontant_100_50_Retourne100Euros50Centimes() {
+        int[] resultat = calculateur.decomposerMontant(100.50);
+
+        assertArrayEquals(new int[]{100, 50}, resultat);
+    }
+
+    @Test
+    void decomposerMontant_100_99_Retourne100Euros99Centimes() {
+        int[] resultat = calculateur.decomposerMontant(100.99);
+
+        assertArrayEquals(new int[]{100, 99}, resultat);
+    }
+
+    @Test
+    void decomposerMontant_100_999_Retourne100Euros100Centimes() {
+        int[] resultat = calculateur.decomposerMontant(100.999);
+
+        assertArrayEquals(new int[]{100, 100}, resultat);
+    }
+
+    @Test
+    void decomposerMontant_MontantNegatif_RetourneCentimesNegatifs() {
+        int[] resultat = calculateur.decomposerMontant(-1.23);
+
+        assertArrayEquals(new int[]{-1, -23}, resultat);
+    }
 }
 ```
 
@@ -264,12 +367,113 @@ public class RapportLegacy {
 3. Écrivez **5 tests** utilisant le nouveau constructeur avec des mocks :
 
 ```java
+package com.formation.tdd.legacy.rapport;
+
+import java.util.List;
+
+public interface DatabaseAccessor {
+    List<Ligne> requeter(String sql);
+}
+package com.formation.tdd.legacy.rapport;
+
+public interface FileWriter {
+    String ecrire(String nomFichier, String contenu);
+}
+package com.formation.tdd.legacy.rapport;
+
+public interface EmailSender {
+    void envoyer(String destinataire, String sujet, String corps);
+}
+package com.formation.tdd.legacy.rapport;
+
+public record Ligne(String produit, double montant) {
+}
+
+package com.formation.tdd.legacy.rapport;
+
+import java.util.List;
+import java.util.Objects;
+
+public class RapportLegacy {
+
+    private final DatabaseAccessor db;
+    private final FileWriter fileWriter;
+    private final EmailSender emailSender;
+
+    public RapportLegacy() {
+        this(
+            new MySQLDatabaseAccessor("jdbc:mysql://prod:3306/db"),
+            new LocalFileWriter("/var/reports/"),
+            new SMTPEmailSender("smtp.prod.com", 587)
+        );
+    }
+
+
+
+    public void genererEtEnvoyer(String mois) {
+        List<Ligne> donnees =
+            db.requeter("SELECT * FROM ventes WHERE mois='" + mois + "'");
+
+        String contenu = formaterRapport(donnees);
+
+        String chemin = fileWriter.ecrire("rapport_" + mois + ".txt", contenu);
+
+        emailSender.envoyer(
+            "direction@entreprise.com",
+            "Rapport " + mois,
+            "Voir pièce jointe : " + chemin
+        );
+    }
+
+    private String formaterRapport(List<Ligne> donnees) {
+        if (donnees == null || donnees.isEmpty()) {
+            return "Rapport vide";
+        }
+
+        StringBuilder builder = new StringBuilder("Rapport généré\n");
+        for (Ligne ligne : donnees) {
+            builder.append(ligne.produit())
+                   .append(" : ")
+                   .append(ligne.montant())
+                   .append("\n");
+        }
+        return builder.toString();
+    }
+}
+
+class MySQLDatabaseAccessor implements DatabaseAccessor {
+    public MySQLDatabaseAccessor(String url) {}
+
+    @Override
+    public List<Ligne> requeter(String sql) {
+        throw new UnsupportedOperationException("Accès BDD réel non disponible en test");
+    }
+}
+class LocalFileWriter implements FileWriter {
+    public LocalFileWriter(String dossier) {}
+
+    @Override
+    public String ecrire(String nomFichier, String contenu) {
+        throw new UnsupportedOperationException("Écriture réelle non disponible en test");
+    }
+}
+class SMTPEmailSender implements EmailSender {
+    public SMTPEmailSender(String host, int port) {}
+
+    @Override
+    public void envoyer(String destinataire, String sujet, String corps) {
+        throw new UnsupportedOperationException("SMTP réel non disponible en test");
+    }
+}
+
 // Tests attendus :
 void genererEtEnvoyer_DonneesTrouvees_FormateEtEcrit()
 void genererEtEnvoyer_FichierEcrit_EnvoieEmail()
 void genererEtEnvoyer_EmailContientNomFichier()
 void genererEtEnvoyer_AucuneDonnee_RapportVide()
 void genererEtEnvoyer_EchecEcriture_NEnvoiePasEmail()
+
+
 ```
 
 **Règle :** Le constructeur original doit **continuer à fonctionner** (pas de régression).
