@@ -1016,6 +1016,249 @@ void payer_CarteValide_PaiementRefuse_LeveException()
 
 // 5. Carte valide, montants différents → stub répond différemment selon le montant
 void payer_GrandMontant_UtilisePaiementSpecial()
+
+public interface PaiementAPI {
+    PaiementResult payer(String carteId, double montant);
+    boolean rembourser(String transactionId);
+    StatutCarte getStatutCarte(String carteId);
+}
+public enum StatutCarte {
+    VALIDE,
+    EXPIREE,
+    BLOQUEE
+}
+public enum StatutCommande {
+    EN_ATTENTE,
+    PAYEE
+}
+public class PaiementResult {
+
+    private final boolean success;
+    private final String transactionId;
+    private final String raison;
+
+    private PaiementResult(boolean success, String transactionId, String raison) {
+        this.success = success;
+        this.transactionId = transactionId;
+        this.raison = raison;
+    }
+
+    public static PaiementResult accepte(String transactionId) {
+        return new PaiementResult(true, transactionId, null);
+    }
+
+    public static PaiementResult refuse(String raison) {
+        return new PaiementResult(false, null, raison);
+    }
+
+    public boolean isSuccess() {
+        return success;
+    }
+
+    public String getTransactionId() {
+        return transactionId;
+    }
+
+    public String getRaison() {
+        return raison;
+    }
+}
+public class Commande {
+
+    private final double montant;
+    private StatutCommande statut = StatutCommande.EN_ATTENTE;
+    private String transactionId;
+
+    public Commande(double montant) {
+        this.montant = montant;
+    }
+
+    public double getMontant() {
+        return montant;
+    }
+
+    public StatutCommande getStatut() {
+        return statut;
+    }
+
+    public void setStatut(StatutCommande statut) {
+        this.statut = statut;
+    }
+
+    public String getTransactionId() {
+        return transactionId;
+    }
+
+    public void setTransactionId(String transactionId) {
+        this.transactionId = transactionId;
+    }
+}
+public class PaiementService {
+
+    private final PaiementAPI api;
+
+    public PaiementService(PaiementAPI api) {
+        this.api = api;
+    }
+
+    public Commande payer(Commande commande, String carteId) {
+        StatutCarte statut = api.getStatutCarte(carteId);
+
+        if (statut == StatutCarte.EXPIREE) {
+            throw new CarteExpireException(carteId);
+        }
+
+        if (statut == StatutCarte.BLOQUEE) {
+            throw new CarteBloqueException(carteId);
+        }
+
+        PaiementResult result = api.payer(carteId, commande.getMontant());
+
+        if (!result.isSuccess()) {
+            throw new PaiementRefuseException(result.getRaison());
+        }
+
+        commande.setStatut(StatutCommande.PAYEE);
+        commande.setTransactionId(result.getTransactionId());
+
+        return commande;
+    }
+}
+public class CarteExpireException extends RuntimeException {
+    public CarteExpireException(String carteId) {
+        super("Carte expirée : " + carteId);
+    }
+}
+public class CarteBloqueException extends RuntimeException {
+    public CarteBloqueException(String carteId) {
+        super("Carte bloquée : " + carteId);
+    }
+}
+public class PaiementRefuseException extends RuntimeException {
+    public PaiementRefuseException(String raison) {
+        super("Paiement refusé : " + raison);
+    }
+}
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class PaiementServiceTest {
+
+    @Mock
+    PaiementAPI api;
+
+    @InjectMocks
+    PaiementService paiementService;
+
+    @Test
+    void payer_CarteValide_CommandePayee() {
+        // Arrange
+        Commande commande = new Commande(100.0);
+
+        when(api.getStatutCarte("CARD-OK"))
+            .thenReturn(StatutCarte.VALIDE);
+
+        when(api.payer("CARD-OK", 100.0))
+            .thenReturn(PaiementResult.accepte("TX-001"));
+
+        // Act
+        Commande resultat = paiementService.payer(commande, "CARD-OK");
+
+        // Assert
+        assertEquals(StatutCommande.PAYEE, resultat.getStatut());
+        assertEquals("TX-001", resultat.getTransactionId());
+
+        verify(api).getStatutCarte("CARD-OK");
+        verify(api).payer("CARD-OK", 100.0);
+    }
+
+    @Test
+    void payer_CarteExpiree_LeveException_SansAppelPaiement() {
+        Commande commande = new Commande(100.0);
+
+        when(api.getStatutCarte("CARD-EXPIRED"))
+            .thenReturn(StatutCarte.EXPIREE);
+
+        assertThrows(
+            CarteExpireException.class,
+            () -> paiementService.payer(commande, "CARD-EXPIRED")
+        );
+
+        verify(api).getStatutCarte("CARD-EXPIRED");
+        verify(api, never()).payer(anyString(), anyDouble());
+    }
+
+    @Test
+    void payer_CarteBloqueee_LeveException() {
+        Commande commande = new Commande(100.0);
+
+        when(api.getStatutCarte("CARD-BLOCKED"))
+            .thenReturn(StatutCarte.BLOQUEE);
+
+        assertThrows(
+            CarteBloqueException.class,
+            () -> paiementService.payer(commande, "CARD-BLOCKED")
+        );
+
+        verify(api).getStatutCarte("CARD-BLOCKED");
+        verify(api, never()).payer(anyString(), anyDouble());
+    }
+
+    @Test
+    void payer_CarteValide_PaiementRefuse_LeveException() {
+        Commande commande = new Commande(100.0);
+
+        when(api.getStatutCarte("CARD-OK"))
+            .thenReturn(StatutCarte.VALIDE);
+
+        when(api.payer("CARD-OK", 100.0))
+            .thenReturn(PaiementResult.refuse("Fonds insuffisants"));
+
+        assertThrows(
+            PaiementRefuseException.class,
+            () -> paiementService.payer(commande, "CARD-OK")
+        );
+
+        assertEquals(StatutCommande.EN_ATTENTE, commande.getStatut());
+        assertNull(commande.getTransactionId());
+    }
+
+    @Test
+    void payer_GrandMontant_UtilisePaiementSpecial() {
+        Commande commande = new Commande(1500.0);
+
+        when(api.getStatutCarte("CARD-OK"))
+            .thenReturn(StatutCarte.VALIDE);
+
+        // Stubbing conditionnel dynamique selon le montant
+        when(api.payer(eq("CARD-OK"), anyDouble()))
+            .thenAnswer(invocation -> {
+                double montant = invocation.getArgument(1);
+
+                if (montant >= 1000.0) {
+                    return PaiementResult.accepte("TX-SPECIAL");
+                }
+
+                return PaiementResult.accepte("TX-CLASSIC");
+            });
+
+        Commande resultat = paiementService.payer(commande, "CARD-OK");
+
+        assertEquals(StatutCommande.PAYEE, resultat.getStatut());
+        assertEquals("TX-SPECIAL", resultat.getTransactionId());
+
+        verify(api).payer("CARD-OK", 1500.0);
+    }
+}
 ```
 
 **Bonus :** Pour le test 2, vérifiez que `api.payer()` n'est **jamais** appelé quand la carte est expirée.
@@ -1050,8 +1293,12 @@ public class CommandeService {
 
 ```java
 // Test 1 : Toutes les étapes exécutées dans le bon ordre
-void passerCommande_Valide_ExecuteToutes5Etapes()
 // → Vérifiez que chaque service est appelé EXACTEMENT une fois
+@Test
+void passerCommande_Valide_ExecuteToutes5Etapes() {
+    ArticlePanier article
+}
+
 
 // Test 2 : Stock insuffisant → aucun paiement, aucun email
 void passerCommande_StockInsuffisant_NiPaiementNiEmail()
